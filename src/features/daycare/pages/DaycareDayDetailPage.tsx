@@ -1,4 +1,5 @@
-import { Navigate, useParams } from "react-router-dom";
+import { useState } from "react";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle,
   Calendar,
@@ -7,9 +8,11 @@ import {
   MapPin,
   PawPrint,
   Sparkles,
+  XCircle,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -21,6 +24,7 @@ import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { BackLink } from "@/features/pets/components/BackLink";
 import { DayStatusBadge } from "@/features/daycare/components/DayStatusBadge";
+import { CancelDayDialog } from "@/features/daycare/components/CancelDayDialog";
 import { useDay } from "@/api/hooks/use-daycare";
 import { formatTime, toLocalDateISO } from "@/lib/format-date";
 import { cn } from "@/lib/utils";
@@ -28,7 +32,9 @@ import type { DayIncident, IncidentSeverity } from "@/types/daycare";
 
 export function DaycareDayDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { data: day, isLoading, isError } = useDay(id ?? "");
+  const [cancelOpen, setCancelOpen] = useState(false);
 
   if (!id) return <Navigate to="/daycare/days" replace />;
 
@@ -180,6 +186,28 @@ export function DaycareDayDetailPage() {
             {day.notes}
           </CardContent>
         </Card>
+      )}
+
+      {/* Cancel — only while the day is still scheduled */}
+      {day.status === "scheduled" && (
+        <>
+          <Button
+            variant="destructive"
+            className="w-full"
+            onClick={() => setCancelOpen(true)}
+          >
+            <XCircle />
+            Cancelar reserva
+          </Button>
+          <CancelDayDialog
+            open={cancelOpen}
+            onOpenChange={setCancelOpen}
+            dayId={day.id}
+            dayDate={day.date}
+            expectedDropOff={day.expected_drop_off}
+            onSuccess={() => navigate("/daycare/days", { replace: true })}
+          />
+        </>
       )}
     </div>
   );
