@@ -50,7 +50,12 @@ export function ResetPasswordPage() {
 
   async function onSubmit(data: FormValues) {
     try {
-      await reset.mutateAsync({ email, ...data });
+      await reset.mutateAsync({
+        email,
+        otp_code: data.otp,
+        new_password: data.password,
+        new_password_confirm: data.password_confirm,
+      });
       toast.success("Tu contraseña fue actualizada. Ya puedes iniciar sesión.");
       navigate("/login", { replace: true });
     } catch (err) {

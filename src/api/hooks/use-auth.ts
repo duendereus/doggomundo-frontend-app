@@ -103,9 +103,9 @@ export function useResendPasswordResetOtp() {
 
 interface ResetPasswordRequest {
   email: string;
-  otp: string;
-  password: string;
-  password_confirm: string;
+  otp_code: string;
+  new_password: string;
+  new_password_confirm: string;
 }
 
 export function useResetPassword() {
