@@ -47,7 +47,10 @@ export function VerifyEmailPage() {
       toast.success("Tu email fue verificado. Ya puedes iniciar sesión.");
       navigate("/login", { replace: true });
     } catch (err) {
-      mapApiErrors(err, setError, "No pudimos verificar el código.");
+      mapApiErrors(err, setError, "No pudimos verificar el código.", {
+        fieldMap: { otp_code: "otp" },
+        formFields: ["otp"],
+      });
     }
   }
 

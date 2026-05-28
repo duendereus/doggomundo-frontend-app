@@ -59,7 +59,14 @@ export function ResetPasswordPage() {
       toast.success("Tu contraseña fue actualizada. Ya puedes iniciar sesión.");
       navigate("/login", { replace: true });
     } catch (err) {
-      mapApiErrors(err, setError, "No pudimos actualizar la contraseña.");
+      mapApiErrors(err, setError, "No pudimos actualizar la contraseña.", {
+        fieldMap: {
+          otp_code: "otp",
+          new_password: "password",
+          new_password_confirm: "password_confirm",
+        },
+        formFields: ["otp", "password", "password_confirm"],
+      });
     }
   }
 
