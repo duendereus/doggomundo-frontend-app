@@ -14,6 +14,8 @@ interface Period {
   key: string;
   label: string;
   icon: ReactNode;
+  /** Themed colors for the period header chip. */
+  chip: string;
   match: (hour: number) => boolean;
 }
 
@@ -22,18 +24,21 @@ const PERIODS: Period[] = [
     key: "morning",
     label: "Mañana",
     icon: <Sun className="h-4 w-4" />,
+    chip: "bg-amber-100 text-amber-600",
     match: (h) => h < 12,
   },
   {
     key: "afternoon",
     label: "Tarde",
     icon: <CloudSun className="h-4 w-4" />,
+    chip: "bg-sky-100 text-sky-600",
     match: (h) => h >= 12 && h < 18,
   },
   {
     key: "evening",
     label: "Noche",
     icon: <Moon className="h-4 w-4" />,
+    chip: "bg-indigo-100 text-indigo-600",
     match: (h) => h >= 18,
   },
 ];
@@ -50,14 +55,27 @@ export function SlotGrid({ slots, selectedStart, onSelect }: Props) {
   })).filter((g) => g.items.length > 0);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {groups.map(({ period, items }) => (
-        <section key={period.key} className="space-y-2">
-          <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-            <span className="text-primary">{period.icon}</span>
-            {period.label}
+        <section key={period.key} className="space-y-3">
+          <div className="flex items-center gap-2.5">
+            <span
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-full",
+                period.chip,
+              )}
+            >
+              {period.icon}
+            </span>
+            <h3 className="text-sm font-semibold tracking-wide text-foreground">
+              {period.label}
+            </h3>
+            <span className="text-xs text-muted-foreground">
+              {items.length} horarios
+            </span>
           </div>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+
+          <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4">
             {items.map((slot) => {
               const disabled = !slot.is_available;
               const active = slot.start === selectedStart;
@@ -69,27 +87,36 @@ export function SlotGrid({ slots, selectedStart, onSelect }: Props) {
                   disabled={disabled}
                   aria-pressed={active}
                   className={cn(
-                    "relative flex flex-col items-center justify-center rounded-xl border px-2 py-3 transition-all outline-none",
-                    "focus-visible:ring-3 focus-visible:ring-ring/50",
+                    "group relative flex flex-col items-center justify-center gap-0.5 overflow-hidden rounded-2xl border px-2 py-3.5 outline-none transition-all duration-200",
+                    "focus-visible:ring-3 focus-visible:ring-accent/50",
                     active
-                      ? "border-primary bg-primary text-primary-foreground shadow-md scale-[1.02]"
-                      : "border-border bg-background shadow-sm hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md active:scale-95",
+                      ? "border-transparent bg-gradient-to-br from-primary to-accent text-white shadow-lg shadow-accent/30 scale-[1.04]"
+                      : "border-accent/15 bg-surface-soft text-foreground hover:-translate-y-1 hover:border-accent hover:bg-accent/10 hover:shadow-lg hover:shadow-accent/20 active:scale-95",
                     disabled &&
-                      "opacity-40 cursor-not-allowed hover:translate-y-0 hover:border-border hover:shadow-sm active:scale-100",
+                      "pointer-events-none opacity-40 hover:translate-y-0 hover:border-accent/15 hover:bg-surface-soft hover:shadow-none",
                   )}
                 >
+                  {/* Decorative top accent bar on hover/active. */}
+                  <span
+                    className={cn(
+                      "absolute inset-x-0 top-0 h-1 transition-opacity",
+                      active
+                        ? "bg-white/40 opacity-100"
+                        : "bg-accent opacity-0 group-hover:opacity-100",
+                    )}
+                  />
                   {active && (
-                    <Check className="absolute right-1.5 top-1.5 h-3.5 w-3.5" />
+                    <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-white/25">
+                      <Check className="h-3 w-3" />
+                    </span>
                   )}
-                  <span className="text-base font-semibold tabular-nums">
+                  <span className="text-lg font-bold leading-none tabular-nums">
                     {formatTime(slot.start)}
                   </span>
                   <span
                     className={cn(
-                      "text-[11px]",
-                      active
-                        ? "text-primary-foreground/80"
-                        : "text-muted-foreground",
+                      "text-[11px] font-medium",
+                      active ? "text-white/80" : "text-muted-foreground",
                     )}
                   >
                     {durationMin(slot)} min
