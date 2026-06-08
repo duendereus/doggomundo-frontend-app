@@ -27,11 +27,7 @@ import { PetAvatar } from "@/features/pets/components/PetAvatar";
 import { BackLink } from "@/features/pets/components/BackLink";
 import { PetDaycareSection } from "@/features/daycare/components/PetDaycareSection";
 import { usePet, useDeletePet, useUpdatePetPhoto } from "@/api/hooks/use-pets";
-import {
-  SPECIES_LABEL,
-  GENDER_LABEL,
-  SIZE_LABEL,
-} from "@/types/pet";
+import { GENDER_LABEL } from "@/types/pet";
 import { formatAgeFromBirth, formatDate } from "@/lib/format-date";
 
 const SUB_PAGES = [
@@ -149,11 +145,7 @@ export function PetDetailPage() {
           <div className="min-w-0 flex-1 space-y-1">
             <h1 className="truncate text-2xl font-semibold">{pet.name}</h1>
             <p className="text-sm text-muted-foreground">
-              {[
-                pet.species ? SPECIES_LABEL[pet.species] : null,
-                pet.breed,
-                age,
-              ]
+              {[pet.breed?.name ?? null, age]
                 .filter(Boolean)
                 .join(" · ") || "Completa su perfil"}
             </p>
@@ -193,17 +185,15 @@ export function PetDetailPage() {
           <CardTitle className="text-base">Información</CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
-          <DetailRow label="Especie" value={pet.species ? SPECIES_LABEL[pet.species] : null} />
-          <DetailRow label="Raza" value={pet.breed} />
+          <DetailRow label="Raza" value={pet.breed?.name ?? null} />
           <DetailRow label="Sexo" value={pet.gender ? GENDER_LABEL[pet.gender] : null} />
           <DetailRow
             label="Nacimiento"
             value={pet.birth_date ? formatDate(pet.birth_date) : null}
           />
           <DetailRow label="Edad" value={age} />
-          <DetailRow label="Tamaño" value={pet.size ? SIZE_LABEL[pet.size] : null} />
-          <DetailRow label="Peso" value={pet.weight ? `${pet.weight} kg` : null} />
-          <DetailRow label="Microchip" value={pet.microchip_id} />
+          <DetailRow label="Tipo de alimento" value={pet.food_type?.name ?? null} />
+          <DetailRow label="Marca del alimento" value={pet.food_brand?.name ?? null} />
         </CardContent>
       </Card>
 

@@ -3,16 +3,20 @@ import type { Appointment, AppointmentListItem } from "@/types/appointment";
 import type { OrderListItem } from "@/types/order";
 import type { MembershipPlan } from "@/types/membership";
 
+const DALMATA = { id: "breed-dalmata", name: "Dálmata", slug: "dalmata" };
+
 export function makePet(overrides: Partial<Pet> = {}): Pet {
   return {
     id: "pet-1",
     name: "Nala",
     species: "DOG",
-    breed: "Dálmata",
+    breed: DALMATA,
     birth_date: "2020-06-14",
     gender: "FEMALE",
-    size: "SMALL",
-    weight: "32.00",
+    food_type: null,
+    food_brand: null,
+    size: null,
+    weight: null,
     microchip_id: null,
     photo: null,
     health_notes: "",
@@ -34,9 +38,8 @@ export function makePetListItem(
     id: "pet-1",
     name: "Nala",
     species: "DOG",
-    breed: "Dálmata",
+    breed: DALMATA,
     gender: "FEMALE",
-    size: "SMALL",
     age_years: 5,
     onboarding_status: "BASIC",
     onboarding_completion_percentage: 70,

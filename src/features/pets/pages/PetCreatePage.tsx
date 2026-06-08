@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   Card,
   CardContent,
@@ -23,16 +24,22 @@ import {
 import { FormErrors } from "@/components/shared/FormErrors";
 import { BackLink } from "@/features/pets/components/BackLink";
 import { mapApiErrors } from "@/features/auth/lib/map-api-errors";
-import { useCreatePet } from "@/api/hooks/use-pets";
-import { SPECIES_LABEL, GENDER_LABEL } from "@/types/pet";
-import type { Species, Gender } from "@/types/pet";
+import {
+  useBreeds,
+  useCreatePet,
+  useFoodBrands,
+  useFoodTypes,
+} from "@/api/hooks/use-pets";
+import { GENDER_LABEL } from "@/types/pet";
+import type { CreatePetPayload, Gender } from "@/types/pet";
 
 const schema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
-  species: z.enum(["DOG", "CAT"], { message: "Selecciona una especie" }),
   gender: z.enum(["MALE", "FEMALE", "UNKNOWN"]).optional(),
   breed: z.string().optional(),
   birth_date: z.string().optional(),
+  food_type: z.string().optional(),
+  food_brand: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -40,6 +47,9 @@ type FormValues = z.infer<typeof schema>;
 export function PetCreatePage() {
   const navigate = useNavigate();
   const create = useCreatePet();
+  const { data: breeds = [], isLoading: breedsLoading } = useBreeds();
+  const { data: foodTypes = [], isLoading: foodTypesLoading } = useFoodTypes();
+  const { data: foodBrands = [], isLoading: foodBrandsLoading } = useFoodBrands();
 
   const {
     register,
@@ -53,17 +63,20 @@ export function PetCreatePage() {
       name: "",
       breed: "",
       birth_date: "",
+      food_type: "",
+      food_brand: "",
     },
   });
 
   async function onSubmit(data: FormValues) {
     try {
-      const payload = {
+      const payload: CreatePetPayload = {
         name: data.name,
-        species: data.species as Species,
         ...(data.gender ? { gender: data.gender as Gender } : {}),
         ...(data.breed ? { breed: data.breed } : {}),
         ...(data.birth_date ? { birth_date: data.birth_date } : {}),
+        ...(data.food_type ? { food_type: data.food_type } : {}),
+        ...(data.food_brand ? { food_brand: data.food_brand } : {}),
       };
       const pet = await create.mutateAsync(payload);
       toast.success(`${pet.name} quedó registrado. Ahora completa su perfil.`);
@@ -81,7 +94,7 @@ export function PetCreatePage() {
         <CardHeader>
           <CardTitle>Nueva mascota</CardTitle>
           <CardDescription>
-            Con el nombre y la especie basta para empezar. Luego podrás completar su perfil.
+            Con el nombre basta para empezar. Luego podrás completar su perfil.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -98,31 +111,6 @@ export function PetCreatePage() {
               />
               {errors.name && (
                 <p className="text-sm text-destructive">{errors.name.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="species">Especie</Label>
-              <Controller
-                control={control}
-                name="species"
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger id="species" className="w-full" aria-invalid={Boolean(errors.species)}>
-                      <SelectValue placeholder="Selecciona" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(Object.keys(SPECIES_LABEL) as Species[]).map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {SPECIES_LABEL[s]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              {errors.species && (
-                <p className="text-sm text-destructive">{errors.species.message}</p>
               )}
             </div>
 
@@ -150,11 +138,20 @@ export function PetCreatePage() {
 
             <div className="space-y-1.5">
               <Label htmlFor="breed">Raza</Label>
-              <Input
-                id="breed"
-                autoComplete="off"
-                placeholder="Opcional"
-                {...register("breed")}
+              <Controller
+                control={control}
+                name="breed"
+                render={({ field }) => (
+                  <SearchableSelect
+                    id="breed"
+                    options={breeds}
+                    value={field.value || null}
+                    onChange={(v) => field.onChange(v ?? "")}
+                    placeholder="Selecciona una raza"
+                    searchPlaceholder="Busca tu raza…"
+                    isLoading={breedsLoading}
+                  />
+                )}
               />
             </div>
 
@@ -164,6 +161,44 @@ export function PetCreatePage() {
                 id="birth_date"
                 type="date"
                 {...register("birth_date")}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="food_type">Tipo de alimento</Label>
+              <Controller
+                control={control}
+                name="food_type"
+                render={({ field }) => (
+                  <SearchableSelect
+                    id="food_type"
+                    options={foodTypes}
+                    value={field.value || null}
+                    onChange={(v) => field.onChange(v ?? "")}
+                    placeholder="¿Qué come?"
+                    searchPlaceholder="Buscar tipo…"
+                    isLoading={foodTypesLoading}
+                  />
+                )}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="food_brand">Marca del alimento</Label>
+              <Controller
+                control={control}
+                name="food_brand"
+                render={({ field }) => (
+                  <SearchableSelect
+                    id="food_brand"
+                    options={foodBrands}
+                    value={field.value || null}
+                    onChange={(v) => field.onChange(v ?? "")}
+                    placeholder="Opcional"
+                    searchPlaceholder="Buscar marca…"
+                    isLoading={foodBrandsLoading}
+                  />
+                )}
               />
             </div>
 

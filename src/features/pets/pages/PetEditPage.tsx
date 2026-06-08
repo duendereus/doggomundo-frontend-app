@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   Card,
   CardContent,
@@ -26,32 +27,23 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { BackLink } from "@/features/pets/components/BackLink";
 import { mapApiErrors } from "@/features/auth/lib/map-api-errors";
 import {
+  useBreeds,
+  useFoodBrands,
+  useFoodTypes,
   usePet,
   useUpdatePetBasic,
   useUpdatePetComplete,
 } from "@/api/hooks/use-pets";
-import {
-  SPECIES_LABEL,
-  GENDER_LABEL,
-  SIZE_LABEL,
-} from "@/types/pet";
-import type { Pet, Species, Gender, PetSize } from "@/types/pet";
+import { GENDER_LABEL } from "@/types/pet";
+import type { Pet, Gender } from "@/types/pet";
 
 const schema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
-  species: z.enum(["DOG", "CAT"]),
   gender: z.enum(["MALE", "FEMALE", "UNKNOWN"]).optional(),
   breed: z.string().optional(),
   birth_date: z.string().optional(),
-  size: z.enum(["SMALL", "MEDIUM", "LARGE", "X_LARGE"]).optional(),
-  weight: z.string().optional(),
-  microchip_id: z
-    .string()
-    .optional()
-    .refine(
-      (v) => !v || /^\d{15}$/.test(v),
-      "El microchip debe tener exactamente 15 dígitos",
-    ),
+  food_type: z.string().optional(),
+  food_brand: z.string().optional(),
   health_notes: z.string().optional(),
   allergies: z.string().optional(),
 });
@@ -60,16 +52,14 @@ type FormValues = z.infer<typeof schema>;
 
 const BASIC_KEYS = [
   "name",
-  "species",
   "gender",
   "breed",
   "birth_date",
+  "food_type",
 ] as const satisfies readonly (keyof FormValues)[];
 
 const COMPLETE_KEYS = [
-  "size",
-  "weight",
-  "microchip_id",
+  "food_brand",
   "health_notes",
   "allergies",
 ] as const satisfies readonly (keyof FormValues)[];
@@ -112,6 +102,9 @@ function PetEditForm({ pet }: FormProps) {
   const navigate = useNavigate();
   const updateBasic = useUpdatePetBasic(pet.id);
   const updateComplete = useUpdatePetComplete(pet.id);
+  const { data: breeds = [], isLoading: breedsLoading } = useBreeds();
+  const { data: foodTypes = [], isLoading: foodTypesLoading } = useFoodTypes();
+  const { data: foodBrands = [], isLoading: foodBrandsLoading } = useFoodBrands();
 
   const {
     register,
@@ -123,13 +116,11 @@ function PetEditForm({ pet }: FormProps) {
     resolver: zodResolver(schema),
     defaultValues: {
       name: pet.name,
-      species: pet.species ?? undefined,
       gender: pet.gender ?? undefined,
-      breed: pet.breed ?? "",
+      breed: pet.breed?.id ?? "",
       birth_date: pet.birth_date ?? "",
-      size: pet.size ?? undefined,
-      weight: pet.weight ?? "",
-      microchip_id: pet.microchip_id ?? "",
+      food_type: pet.food_type?.id ?? "",
+      food_brand: pet.food_brand?.id ?? "",
       health_notes: pet.health_notes ?? "",
       allergies: pet.allergies ?? "",
     },
@@ -199,75 +190,48 @@ function PetEditForm({ pet }: FormProps) {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="species">Especie</Label>
-                <Controller
-                  control={control}
-                  name="species"
-                  render={({ field }) => (
-                    <Select
-                      value={field.value ?? ""}
-                      onValueChange={field.onChange}
-                    >
-                      <SelectTrigger id="species" className="w-full">
-                        <SelectValue placeholder="Selecciona" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(Object.keys(SPECIES_LABEL) as Species[]).map((s) => (
-                          <SelectItem key={s} value={s}>
-                            {SPECIES_LABEL[s]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {errors.species && (
-                  <p className="text-sm text-destructive">
-                    {errors.species.message}
-                  </p>
+            <div className="space-y-1.5">
+              <Label htmlFor="gender">Sexo</Label>
+              <Controller
+                control={control}
+                name="gender"
+                render={({ field }) => (
+                  <Select
+                    value={field.value ?? ""}
+                    onValueChange={field.onChange}
+                  >
+                    <SelectTrigger id="gender" className="w-full">
+                      <SelectValue placeholder="Sin especificar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(GENDER_LABEL) as Gender[]).map((g) => (
+                        <SelectItem key={g} value={g}>
+                          {GENDER_LABEL[g]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 )}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="gender">Sexo</Label>
-                <Controller
-                  control={control}
-                  name="gender"
-                  render={({ field }) => (
-                    <Select
-                      value={field.value ?? ""}
-                      onValueChange={field.onChange}
-                    >
-                      <SelectTrigger id="gender" className="w-full">
-                        <SelectValue placeholder="Sin especificar" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(Object.keys(GENDER_LABEL) as Gender[]).map((g) => (
-                          <SelectItem key={g} value={g}>
-                            {GENDER_LABEL[g]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {errors.gender && (
-                  <p className="text-sm text-destructive">
-                    {errors.gender.message}
-                  </p>
-                )}
-              </div>
+              />
             </div>
 
             <div className="space-y-1.5">
               <Label htmlFor="breed">Raza</Label>
-              <Input id="breed" {...register("breed")} />
-              {errors.breed && (
-                <p className="text-sm text-destructive">
-                  {errors.breed.message}
-                </p>
-              )}
+              <Controller
+                control={control}
+                name="breed"
+                render={({ field }) => (
+                  <SearchableSelect
+                    id="breed"
+                    options={breeds}
+                    value={field.value || null}
+                    onChange={(v) => field.onChange(v ?? "")}
+                    placeholder="Selecciona una raza"
+                    searchPlaceholder="Busca tu raza…"
+                    isLoading={breedsLoading}
+                  />
+                )}
+              />
             </div>
 
             <div className="space-y-1.5">
@@ -284,66 +248,54 @@ function PetEditForm({ pet }: FormProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Datos adicionales</CardTitle>
+            <CardTitle className="text-base">Alimentación</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="size">Tamaño</Label>
-                <Controller
-                  control={control}
-                  name="size"
-                  render={({ field }) => (
-                    <Select
-                      value={field.value ?? ""}
-                      onValueChange={field.onChange}
-                    >
-                      <SelectTrigger id="size" className="w-full">
-                        <SelectValue placeholder="Selecciona" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(Object.keys(SIZE_LABEL) as PetSize[]).map((s) => (
-                          <SelectItem key={s} value={s}>
-                            {SIZE_LABEL[s]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {errors.size && (
-                  <p className="text-sm text-destructive">
-                    {errors.size.message}
-                  </p>
+            <div className="space-y-1.5">
+              <Label htmlFor="food_type">Tipo de alimento</Label>
+              <Controller
+                control={control}
+                name="food_type"
+                render={({ field }) => (
+                  <SearchableSelect
+                    id="food_type"
+                    options={foodTypes}
+                    value={field.value || null}
+                    onChange={(v) => field.onChange(v ?? "")}
+                    placeholder="¿Qué come?"
+                    searchPlaceholder="Buscar tipo…"
+                    isLoading={foodTypesLoading}
+                  />
                 )}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="weight">Peso (kg)</Label>
-                <Input
-                  id="weight"
-                  type="number"
-                  step="0.1"
-                  inputMode="decimal"
-                  {...register("weight")}
-                />
-                {errors.weight && (
-                  <p className="text-sm text-destructive">
-                    {errors.weight.message}
-                  </p>
-                )}
-              </div>
+              />
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="microchip_id">Microchip</Label>
-              <Input id="microchip_id" {...register("microchip_id")} />
-              {errors.microchip_id && (
-                <p className="text-sm text-destructive">
-                  {errors.microchip_id.message}
-                </p>
-              )}
+              <Label htmlFor="food_brand">Marca del alimento</Label>
+              <Controller
+                control={control}
+                name="food_brand"
+                render={({ field }) => (
+                  <SearchableSelect
+                    id="food_brand"
+                    options={foodBrands}
+                    value={field.value || null}
+                    onChange={(v) => field.onChange(v ?? "")}
+                    placeholder="Opcional"
+                    searchPlaceholder="Buscar marca…"
+                    isLoading={foodBrandsLoading}
+                  />
+                )}
+              />
             </div>
+          </CardContent>
+        </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Salud</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="health_notes">Notas de salud</Label>
               <Textarea
@@ -352,11 +304,6 @@ function PetEditForm({ pet }: FormProps) {
                 placeholder="Condiciones, medicamentos, etc."
                 {...register("health_notes")}
               />
-              {errors.health_notes && (
-                <p className="text-sm text-destructive">
-                  {errors.health_notes.message}
-                </p>
-              )}
             </div>
 
             <div className="space-y-1.5">
@@ -367,11 +314,6 @@ function PetEditForm({ pet }: FormProps) {
                 placeholder="Alimentos, medicamentos, etc."
                 {...register("allergies")}
               />
-              {errors.allergies && (
-                <p className="text-sm text-destructive">
-                  {errors.allergies.message}
-                </p>
-              )}
             </div>
           </CardContent>
         </Card>

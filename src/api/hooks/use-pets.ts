@@ -6,6 +6,7 @@ import type {
   PetListItem,
   PetListParams,
   CreatePetPayload,
+  LookupOption,
   UpdatePetBasicPayload,
   UpdatePetCompletePayload,
   OnboardingStatus,
@@ -25,7 +26,40 @@ export const petKeys = {
   medical: (id: string) => [...petKeys.all, "medical", id] as const,
   vaccinations: (id: string) => [...petKeys.all, "vaccinations", id] as const,
   documents: (id: string) => [...petKeys.all, "documents", id] as const,
+  breeds: ["pets", "breeds"] as const,
+  foodTypes: ["pets", "food-types"] as const,
+  foodBrands: ["pets", "food-brands"] as const,
 };
+
+// Lookup catalogs are small and stable: fetch once and keep cached for the
+// session so dropdowns open instantly across multiple forms.
+const LOOKUP_STALE_TIME = 1000 * 60 * 60; // 1h
+
+export function useBreeds() {
+  return useQuery({
+    queryKey: petKeys.breeds,
+    queryFn: () => api.get<LookupOption[]>("/pets/breeds/").then((r) => r.data),
+    staleTime: LOOKUP_STALE_TIME,
+  });
+}
+
+export function useFoodTypes() {
+  return useQuery({
+    queryKey: petKeys.foodTypes,
+    queryFn: () =>
+      api.get<LookupOption[]>("/pets/food-types/").then((r) => r.data),
+    staleTime: LOOKUP_STALE_TIME,
+  });
+}
+
+export function useFoodBrands() {
+  return useQuery({
+    queryKey: petKeys.foodBrands,
+    queryFn: () =>
+      api.get<LookupOption[]>("/pets/food-brands/").then((r) => r.data),
+    staleTime: LOOKUP_STALE_TIME,
+  });
+}
 
 export function usePets(params: PetListParams = {}) {
   return useQuery({

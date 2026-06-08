@@ -2,13 +2,23 @@ export type Species = "DOG" | "CAT";
 export type Gender = "MALE" | "FEMALE" | "UNKNOWN";
 export type PetSize = "SMALL" | "MEDIUM" | "LARGE" | "X_LARGE";
 
+/** Shape returned by /pets/breeds/, /pets/food-types/, /pets/food-brands/. */
+export interface LookupOption {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 export interface Pet {
   id: string;
   name: string;
   species: Species | null;
-  breed: string | null;
+  breed: LookupOption | null;
   birth_date: string | null;
   gender: Gender | null;
+  food_type: LookupOption | null;
+  food_brand: LookupOption | null;
+  /** Legacy — kept in DB but not surfaced in the customer form. */
   size: PetSize | null;
   weight: string | null;
   microchip_id: string | null;
@@ -27,9 +37,8 @@ export interface PetListItem {
   id: string;
   name: string;
   species: Species | null;
-  breed: string | null;
+  breed: LookupOption | null;
   gender: Gender | null;
-  size: PetSize | null;
   age_years: number;
   onboarding_status: string;
   onboarding_completion_percentage: number;
@@ -44,26 +53,26 @@ export interface PetListParams {
   is_active?: boolean;
 }
 
+/** species is auto-set to DOG by the backend, so the form never sends it. */
 export interface CreatePetPayload {
   name: string;
-  species: Species;
   gender?: Gender;
   breed?: string;
+  food_type?: string;
+  food_brand?: string;
   birth_date?: string;
 }
 
 export interface UpdatePetBasicPayload {
   name?: string;
-  species?: Species;
   gender?: Gender;
   breed?: string;
+  food_type?: string;
   birth_date?: string;
 }
 
 export interface UpdatePetCompletePayload {
-  size?: PetSize;
-  weight?: string;
-  microchip_id?: string;
+  food_brand?: string;
   photo?: string;
   health_notes?: string;
   allergies?: string;
