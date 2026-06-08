@@ -3,7 +3,7 @@ import { ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { PetAvatar } from "./PetAvatar";
-import { SPECIES_LABEL, GENDER_LABEL } from "@/types/pet";
+import { GENDER_LABEL } from "@/types/pet";
 import type { PetListItem } from "@/types/pet";
 import { formatAgeFromBirth } from "@/lib/format-date";
 
@@ -15,8 +15,7 @@ interface Props {
 export function PetCard({ pet, birthDate }: Props) {
   const age = birthDate ? formatAgeFromBirth(birthDate) : null;
   const metaBits = [
-    pet.species ? SPECIES_LABEL[pet.species] : null,
-    pet.breed,
+    pet.breed?.name ?? null,
     age,
     pet.gender ? GENDER_LABEL[pet.gender] : null,
   ].filter(Boolean);
