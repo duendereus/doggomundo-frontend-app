@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Activity,
+  CalendarPlus,
   Camera,
   ChevronRight,
   Edit,
@@ -26,7 +27,9 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { PetAvatar } from "@/features/pets/components/PetAvatar";
 import { BackLink } from "@/features/pets/components/BackLink";
 import { PetDaycareSection } from "@/features/daycare/components/PetDaycareSection";
+import { missingFieldLabels } from "@/features/pets/lib/pet-missing";
 import { usePet, useDeletePet, useUpdatePetPhoto } from "@/api/hooks/use-pets";
+import { useBookingFlowStore } from "@/stores/booking-flow-store";
 import { GENDER_LABEL } from "@/types/pet";
 import { formatAgeFromBirth, formatDate } from "@/lib/format-date";
 
@@ -60,8 +63,18 @@ export function PetDetailPage() {
   const { data: pet, isLoading, isError } = usePet(id ?? "");
   const deletePet = useDeletePet(id ?? "");
   const updatePhoto = useUpdatePetPhoto(id ?? "");
+  const resetBookingFlow = useBookingFlowStore((s) => s.reset);
+  const setBookingPet = useBookingFlowStore((s) => s.setPet);
 
   if (!id) return <Navigate to="/pets" replace />;
+
+  // Quick path: clear any stale wizard state and lock the pet selection so
+  // the booking flow skips the pet picker step and lands on review at the end.
+  function startBookingForPet(petId: string, petName: string) {
+    resetBookingFlow();
+    setBookingPet({ id: petId, name: petName });
+    navigate("/book");
+  }
 
   async function handleDelete() {
     try {
@@ -116,6 +129,7 @@ export function PetDetailPage() {
 
   const completion = pet.onboarding_completion_percentage;
   const age = formatAgeFromBirth(pet.birth_date);
+  const missing = missingFieldLabels(pet);
 
   return (
     <div className="space-y-4">
@@ -158,15 +172,37 @@ export function PetDetailPage() {
         </CardContent>
       </Card>
 
+      <Card className="border-primary/30 bg-primary/5">
+        <CardContent className="flex items-center justify-between gap-3 py-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Reservar para {pet.name}</p>
+            <p className="text-xs text-muted-foreground">
+              Empieza una reserva con {pet.name} ya seleccionado.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => startBookingForPet(pet.id, pet.name)}
+          >
+            <CalendarPlus />
+            Reservar
+          </Button>
+        </CardContent>
+      </Card>
+
       {completion < 100 && (
         <Card>
           <CardContent className="space-y-3 py-4">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 space-y-1">
                 <p className="text-sm font-medium">Perfil {completion}% completo</p>
-                <p className="text-xs text-muted-foreground">
-                  Completa sus datos antes de reservar servicios.
-                </p>
+                {missing.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {missing.length === 1
+                      ? `Te falta: ${missing[0]}.`
+                      : `Te faltan: ${missing.join(", ")}.`}
+                  </p>
+                )}
               </div>
               <Button asChild size="sm">
                 <Link to={`/pets/${pet.id}/edit`}>

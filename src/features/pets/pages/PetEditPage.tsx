@@ -141,6 +141,20 @@ function PetEditForm({ pet }: FormProps) {
   const completion = pet.onboarding_completion_percentage;
   const isComplete = completion >= 100;
 
+  // Smooth-scroll to the relevant section/input and focus it so the user
+  // lands ready to fill the missing field that's still locking their bone.
+  function focusField(key: string) {
+    const targetId = key === "photo" ? "photo-card" : key;
+    const el = document.getElementById(targetId);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    // Defer focus until the scroll begins so the browser doesn't cancel the
+    // smooth animation on focus jump.
+    window.setTimeout(() => {
+      if (el instanceof HTMLElement) el.focus({ preventScroll: true });
+    }, 250);
+  }
+
   async function handlePhotoFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -222,9 +236,9 @@ function PetEditForm({ pet }: FormProps) {
         </p>
       </header>
 
-      <BoneProgress fields={fields} />
+      <BoneProgress fields={fields} onFieldClick={focusField} />
 
-      <Card>
+      <Card id="photo-card" className="scroll-mt-20">
         <CardHeader>
           <CardTitle className="text-base">Foto</CardTitle>
         </CardHeader>
@@ -440,37 +454,39 @@ function PetEditForm({ pet }: FormProps) {
 
 interface BoneProgressProps {
   fields: ReturnType<typeof profileFields>;
+  onFieldClick: (key: string) => void;
 }
 
 /**
- * Visual reward board: one cartoon bone per profile field. Filled bones use
- * the primary color so the user can see at a glance how many "huesitos"
- * they've already earned, and what's left to unlock.
+ * Visual reward board: one cartoon bone per profile field. Filled bones glow
+ * in amber so the user sees at a glance how many "huesitos" they've earned;
+ * empty bones are dashed and clickable — tapping one scrolls to the matching
+ * input so the user knows exactly what to fill to unlock the bone.
  */
-function BoneProgress({ fields }: BoneProgressProps) {
+function BoneProgress({ fields, onFieldClick }: BoneProgressProps) {
   const filled = fields.filter((f) => f.filled).length;
   const total = fields.length;
   const allDone = filled === total;
 
   return (
-    <Card>
+    <Card className="overflow-hidden border-amber-200 bg-gradient-to-br from-amber-50/60 via-background to-background">
       <CardContent className="space-y-3 py-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             {allDone ? (
               <Trophy className="h-5 w-5 text-amber-500" aria-hidden="true" />
             ) : (
-              <Bone className="h-5 w-5 text-primary" aria-hidden="true" />
+              <Bone className="h-5 w-5 text-amber-500" aria-hidden="true" />
             )}
-            <p className="text-sm font-medium">
+            <p className="text-sm font-semibold">
               {allDone
                 ? "¡Perfil completo! 🏆"
                 : `${filled} de ${total} huesitos`}
             </p>
           </div>
           {!allDone && (
-            <span className="text-xs text-muted-foreground">
-              Completa todo y desbloquea reservar
+            <span className="hidden text-xs text-muted-foreground sm:inline">
+              Toca un hueso para llenarlo
             </span>
           )}
         </div>
@@ -479,36 +495,44 @@ function BoneProgress({ fields }: BoneProgressProps) {
           className="grid grid-cols-4 gap-2"
           aria-label="Progreso del perfil"
         >
-          {fields.map((f) => (
-            <li
-              key={f.key}
-              className={cn(
-                "flex flex-col items-center gap-1 rounded-lg border p-2 text-center transition-colors",
-                f.filled
-                  ? "border-primary/40 bg-primary/5"
-                  : "border-dashed border-muted-foreground/30 bg-muted/30",
-              )}
-              aria-label={`${f.label}: ${f.filled ? "completo" : "pendiente"}`}
-            >
-              <Bone
-                className={cn(
-                  "h-5 w-5 transition-transform",
-                  f.filled
-                    ? "text-primary"
-                    : "text-muted-foreground/40 -rotate-12",
-                )}
-                aria-hidden="true"
-              />
-              <span
-                className={cn(
-                  "text-[10px] leading-tight",
-                  f.filled ? "font-medium" : "text-muted-foreground",
-                )}
+          {fields.map((f) =>
+            f.filled ? (
+              <li
+                key={f.key}
+                className="flex flex-col items-center gap-1 rounded-xl border border-amber-300/70 bg-gradient-to-br from-amber-100 to-amber-200/70 p-2 text-center shadow-sm"
+                aria-label={`${f.label}: completo`}
               >
-                {f.label}
-              </span>
-            </li>
-          ))}
+                <Bone
+                  className="h-5 w-5 text-amber-700 drop-shadow-sm"
+                  aria-hidden="true"
+                />
+                <span className="text-[10px] font-medium leading-tight text-amber-900">
+                  {f.label}
+                </span>
+              </li>
+            ) : (
+              <li key={f.key}>
+                <button
+                  type="button"
+                  onClick={() => onFieldClick(f.key)}
+                  className={cn(
+                    "flex w-full flex-col items-center gap-1 rounded-xl border border-dashed border-amber-300/60 bg-amber-50/30 p-2 text-center transition-all",
+                    "hover:border-amber-400 hover:bg-amber-50 hover:shadow-sm active:scale-[0.97]",
+                    "outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-1",
+                  )}
+                  aria-label={`${f.label} pendiente. Toca para llenar.`}
+                >
+                  <Bone
+                    className="h-5 w-5 -rotate-12 text-amber-400/60"
+                    aria-hidden="true"
+                  />
+                  <span className="text-[10px] leading-tight text-muted-foreground">
+                    {f.label}
+                  </span>
+                </button>
+              </li>
+            ),
+          )}
         </ul>
       </CardContent>
     </Card>
