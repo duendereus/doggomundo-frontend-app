@@ -10,6 +10,9 @@ const VARIANT: Record<AppointmentStatus, string> = {
   completed: "bg-muted text-muted-foreground",
   cancelled: "bg-destructive/10 text-destructive",
   no_show: "bg-destructive/10 text-destructive",
+  penalty_cancel: "bg-destructive/10 text-destructive",
+  penalty_no_show: "bg-destructive/10 text-destructive",
+  graced_no_show: "bg-muted text-muted-foreground",
 };
 
 interface Props {

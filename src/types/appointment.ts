@@ -5,7 +5,12 @@ export type AppointmentStatus =
   | "checked_in"
   | "completed"
   | "cancelled"
-  | "no_show";
+  | "no_show"
+  // Penalty-cancellation flow. `penalty_cancel` is set by the customer
+  // confirming a late cancel; the two no-show variants are admin-only.
+  | "penalty_cancel"
+  | "penalty_no_show"
+  | "graced_no_show";
 
 export const APPOINTMENT_STATUS_LABEL: Record<AppointmentStatus, string> = {
   scheduled: "Programada",
@@ -13,6 +18,9 @@ export const APPOINTMENT_STATUS_LABEL: Record<AppointmentStatus, string> = {
   completed: "Completada",
   cancelled: "Cancelada",
   no_show: "No asistió",
+  penalty_cancel: "Cancelada con cargo",
+  penalty_no_show: "No asistió (con cargo)",
+  graced_no_show: "No asistió (sin cargo)",
 };
 
 export type AppointmentChannel = "walkin" | "phone" | "whatsapp" | "web";

@@ -1,6 +1,13 @@
 import type { AppointmentListItem, AppointmentStatus } from "@/types/appointment";
 
-const TERMINAL: AppointmentStatus[] = ["completed", "cancelled", "no_show"];
+const TERMINAL: AppointmentStatus[] = [
+  "completed",
+  "cancelled",
+  "no_show",
+  "penalty_cancel",
+  "penalty_no_show",
+  "graced_no_show",
+];
 
 export function isTerminal(status: AppointmentStatus): boolean {
   return TERMINAL.includes(status);

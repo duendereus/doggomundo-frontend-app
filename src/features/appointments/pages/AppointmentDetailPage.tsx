@@ -80,16 +80,33 @@ export function AppointmentDetailPage() {
 
   const withinWindow = isWithinCancellationWindow(appointment.scheduled_start);
   const terminal = isTerminal(appointment.status);
-  const canCancel =
-    !terminal && !withinWindow && appointment.status === "scheduled";
+  // Customers can now cancel even inside the window — but the action goes
+  // through a separate confirm path that requires acknowledging the penalty.
+  const canCancel = !terminal && appointment.status === "scheduled";
   const headline =
     primaryItem(appointment.items)?.service_name ??
     appointment.business_unit_name;
 
+  // Total price = sum of item price_snapshots. Used to surface the penalty
+  // cost in the warning dialog so the user knows what they'd be agreeing
+  // to. Inline (not useMemo) because hooks below the early-return guards
+  // above would violate Rules of Hooks, and the array is short anyway.
+  const totalPrice = appointment.items.reduce((acc, it) => {
+    const n = Number(it.price_snapshot ?? 0);
+    return Number.isFinite(n) ? acc + n : acc;
+  }, 0);
+  const totalPriceLabel = totalPrice > 0
+    ? `$${totalPrice.toLocaleString("es-MX")}`
+    : null;
+
   async function handleCancel() {
     try {
-      await cancel.mutateAsync();
-      toast.success("Tu cita fue cancelada.");
+      await cancel.mutateAsync({ acknowledgePenalty: withinWindow });
+      toast.success(
+        withinWindow
+          ? "Tu cita fue cancelada. Se aplicará el cargo por cancelación tardía."
+          : "Tu cita fue cancelada.",
+      );
       setConfirmOpen(false);
       navigate("/my/appointments", { replace: true });
     } catch {
@@ -179,9 +196,11 @@ export function AppointmentDetailPage() {
       {!terminal && (
         <div className="space-y-2">
           {withinWindow && (
-            <p className="rounded-md bg-muted p-3 text-xs text-muted-foreground">
-              Falta menos de {CANCELLATION_WINDOW_HOURS} horas para tu cita. Si
-              necesitas hacer cambios, llámanos a la sucursal.
+            <p className="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive">
+              Faltan menos de {CANCELLATION_WINDOW_HOURS} horas para tu cita.
+              Cancelar ahora genera un cargo
+              {totalPriceLabel ? ` de ${totalPriceLabel}` : ""} por cancelación
+              tardía.
             </p>
           )}
           <Button
@@ -199,9 +218,19 @@ export function AppointmentDetailPage() {
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title="Cancelar cita"
-        description="Esta acción no se puede deshacer."
-        confirmLabel="Cancelar cita"
+        title={withinWindow ? "Cancelación tardía con cargo" : "Cancelar cita"}
+        description={
+          withinWindow
+            ? `Faltan menos de ${CANCELLATION_WINDOW_HOURS}h para tu cita. ` +
+              (totalPriceLabel
+                ? `Si cancelas ahora se aplicará un cargo de ${totalPriceLabel} por cancelación tardía. `
+                : "Si cancelas ahora se aplicará un cargo por cancelación tardía. ") +
+              "Esta acción no se puede deshacer."
+            : "Esta acción no se puede deshacer."
+        }
+        confirmLabel={
+          withinWindow ? "Acepto el cargo y cancelo" : "Cancelar cita"
+        }
         cancelLabel="Volver"
         variant="destructive"
         onConfirm={handleCancel}

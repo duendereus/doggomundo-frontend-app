@@ -85,11 +85,25 @@ export function useUpdateMyAppointment(id: string) {
   });
 }
 
+interface CancelAppointmentVariables {
+  /**
+   * Required to be `true` when the appointment is inside the late-cancel
+   * window — the backend rejects late cancels without explicit
+   * acknowledgement so a stray double-click can't trigger a penalty.
+   */
+  acknowledgePenalty?: boolean;
+}
+
 export function useCancelMyAppointment(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      api.post(`/appointments/${id}/cancel/`).then((r) => r.data),
+    mutationFn: ({ acknowledgePenalty }: CancelAppointmentVariables = {}) =>
+      api
+        .post(
+          `/appointments/${id}/cancel/`,
+          acknowledgePenalty ? { acknowledge_penalty: true } : {},
+        )
+        .then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: appointmentKeys.detail(id) });
       qc.invalidateQueries({ queryKey: appointmentKeys.lists() });

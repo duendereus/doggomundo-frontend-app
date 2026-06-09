@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
 import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { AppointmentDetailPage } from "./AppointmentDetailPage";
 import { renderWithProviders } from "@/test/test-utils";
 import { server } from "@/test/msw-server";
@@ -58,7 +59,7 @@ describe("AppointmentDetailPage — cancel button rules", () => {
     ).not.toBeDisabled();
   });
 
-  it("disables cancel and shows the window notice when inside the window", async () => {
+  it("allows cancel inside the window but warns about the penalty cost", async () => {
     const appt = setupAppointment(
       makeAppointment({
         id: "a-soon",
@@ -78,12 +79,63 @@ describe("AppointmentDetailPage — cancel button rules", () => {
       ).toBeInTheDocument(),
     );
 
+    // Cancel is enabled now (was disabled in phase 1) so the user can
+    // pay the penalty if they want.
     expect(
       screen.getByRole("button", { name: /cancelar cita/i }),
-    ).toBeDisabled();
+    ).not.toBeDisabled();
+    // Inline banner explains the cost in red.
     expect(
-      screen.getByText(/falta menos de 12 horas/i),
+      screen.getByText(/cancelar ahora genera un cargo/i),
     ).toBeInTheDocument();
+  });
+
+  it("sends acknowledge_penalty=true when confirming a late cancel", async () => {
+    let postedBody: Record<string, unknown> | null = null;
+    const appt = makeAppointment({
+      id: "a-late",
+      // +8h — inside the 12h window.
+      scheduled_start: "2026-05-10T20:00:00Z",
+      status: "scheduled",
+    });
+    server.use(
+      http.get(`${API}/appointments/${appt.id}/`, () => HttpResponse.json(appt)),
+      http.get(`${API}/pets/`, () =>
+        HttpResponse.json({
+          count: 0, next: null, previous: null, results: [],
+        }),
+      ),
+      http.post(`${API}/appointments/${appt.id}/cancel/`, async ({ request }) => {
+        postedBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({
+          ...appt,
+          status: "penalty_cancel",
+          status_display: "Cancelada con cargo",
+        });
+      }),
+    );
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderWithProviders(<AppointmentDetailPage />, {
+      route: `/my/appointments/${appt.id}`,
+      path: "/my/appointments/:id",
+    });
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: /corte completo/i }),
+      ).toBeInTheDocument(),
+    );
+
+    // Open the destructive confirm dialog
+    await user.click(screen.getByRole("button", { name: /cancelar cita/i }));
+    // Confirm with the penalty-acknowledging button
+    await user.click(
+      await screen.findByRole("button", { name: /acepto el cargo/i }),
+    );
+
+    await waitFor(() => expect(postedBody).not.toBeNull());
+    expect(postedBody).toEqual({ acknowledge_penalty: true });
   });
 
   it("hides cancel entirely on terminal status (cancelled)", async () => {
