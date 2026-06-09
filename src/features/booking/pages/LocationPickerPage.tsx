@@ -33,12 +33,13 @@ export function LocationPickerPage() {
     );
   }, [data, businessUnitCode]);
 
-  // Auto-skip: when there's only one sucursal in the system AND it offers
-  // the picked BU, lock it in and jump straight to the service step so the
-  // user isn't forced to click through a list of one.
-  const totalLocations = data?.count ?? data?.results.length ?? 0;
+  // Auto-skip: when only one sucursal offers the picked BU, lock it in
+  // and jump straight to the service step so the user isn't forced to
+  // click through a list of one. Sucursales without the BU are filtered
+  // upstream, so a placeholder sucursal with zero BUs (or one that
+  // doesn't carry this BU) doesn't count.
   const shouldAutoSkip =
-    totalLocations === 1 && matchingLocations.length === 1 && !!businessUnitCode;
+    matchingLocations.length === 1 && !!businessUnitCode;
 
   useEffect(() => {
     if (!shouldAutoSkip) return;
