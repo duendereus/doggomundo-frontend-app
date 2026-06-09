@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { AuthGuard } from "@/components/layout/AuthGuard";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { useAuthRestore } from "@/hooks/use-auth-restore";
+import { SHOP_ENABLED } from "@/lib/features";
 
 const LoginPage = lazy(() =>
   import("@/features/auth/pages/LoginPage").then((m) => ({ default: m.LoginPage })),
@@ -264,14 +265,21 @@ export function AppRouter() {
                 element={<SubscriptionDetailPage />}
               />
 
-              <Route path="/shop" element={<ShopPage />} />
-              <Route path="/shop/products/:id" element={<ProductDetailPage />} />
-              <Route path="/cart" element={<CartPage />} />
-              <Route path="/checkout" element={<CheckoutPage />} />
-              <Route
-                path="/checkout/success"
-                element={<CheckoutSuccessPage />}
-              />
+              {SHOP_ENABLED && (
+                <>
+                  <Route path="/shop" element={<ShopPage />} />
+                  <Route
+                    path="/shop/products/:id"
+                    element={<ProductDetailPage />}
+                  />
+                  <Route path="/cart" element={<CartPage />} />
+                  <Route path="/checkout" element={<CheckoutPage />} />
+                  <Route
+                    path="/checkout/success"
+                    element={<CheckoutSuccessPage />}
+                  />
+                </>
+              )}
 
               <Route path="/daycare" element={<DaycareLandingPage />} />
               <Route

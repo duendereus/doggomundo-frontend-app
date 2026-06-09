@@ -3,17 +3,22 @@ import { LogOut, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { cn } from "@/lib/utils";
+import { SHOP_ENABLED } from "@/lib/features";
 import { useAuthStore } from "@/stores/auth-store";
 import { useLogout } from "@/api/hooks/use-auth";
 import { selectCartCount, useCartStore } from "@/stores/cart-store";
 
-const DESKTOP_NAV = [
-  { to: "/", label: "Inicio", end: true },
-  { to: "/book", label: "Reservar", end: false },
-  { to: "/my/appointments", label: "Mis citas", end: false },
-  { to: "/memberships", label: "Membresías", end: false },
-  { to: "/shop", label: "Tienda", end: false },
+const ALL_DESKTOP_NAV = [
+  { to: "/", label: "Inicio", end: true, key: "home" },
+  { to: "/book", label: "Reservar", end: false, key: "book" },
+  { to: "/my/appointments", label: "Mis citas", end: false, key: "appointments" },
+  { to: "/memberships", label: "Membresías", end: false, key: "memberships" },
+  { to: "/shop", label: "Tienda", end: false, key: "shop" },
 ];
+
+const DESKTOP_NAV = ALL_DESKTOP_NAV.filter(
+  (item) => SHOP_ENABLED || item.key !== "shop",
+);
 
 export function TopBar() {
   const navigate = useNavigate();
@@ -63,25 +68,27 @@ export function TopBar() {
         </nav>
 
         <div className="ml-auto flex items-center gap-1">
-          <Link
-            to="/cart"
-            aria-label={
-              cartCount > 0
-                ? `Carrito con ${cartCount} producto${cartCount === 1 ? "" : "s"}`
-                : "Carrito"
-            }
-            className="relative inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            <ShoppingCart className="h-4 w-4" />
-            {cartCount > 0 && (
-              <span
-                className="absolute -right-1 -top-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground"
-                aria-hidden="true"
-              >
-                {cartCount > 9 ? "9+" : cartCount}
-              </span>
-            )}
-          </Link>
+          {SHOP_ENABLED && (
+            <Link
+              to="/cart"
+              aria-label={
+                cartCount > 0
+                  ? `Carrito con ${cartCount} producto${cartCount === 1 ? "" : "s"}`
+                  : "Carrito"
+              }
+              className="relative inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <ShoppingCart className="h-4 w-4" />
+              {cartCount > 0 && (
+                <span
+                  className="absolute -right-1 -top-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground"
+                  aria-hidden="true"
+                >
+                  {cartCount > 9 ? "9+" : cartCount}
+                </span>
+              )}
+            </Link>
+          )}
 
           {user && (
             <Link

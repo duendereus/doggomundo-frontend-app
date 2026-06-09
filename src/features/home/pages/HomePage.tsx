@@ -8,42 +8,52 @@ import { findNextUpcoming } from "@/features/appointments/lib/filter";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { TIMEZONE } from "@/lib/format-date";
+import { SHOP_ENABLED } from "@/lib/features";
 import { usePets } from "@/api/hooks/use-pets";
 import { useMyAppointments } from "@/api/hooks/use-appointments";
 import { useAuthStore } from "@/stores/auth-store";
 
-const QUICK_ACTIONS = [
+const ALL_QUICK_ACTIONS = [
   {
+    id: "book",
     to: "/book",
     label: "Reservar",
     description: "Agenda un servicio",
     icon: CalendarPlus,
   },
   {
+    id: "daycare",
     to: "/daycare",
     label: "Day Care",
     description: "Día completo de cuidados",
     icon: Sun,
   },
   {
+    id: "pets",
     to: "/pets",
     label: "Mis mascotas",
     description: "Gestiona sus perfiles",
     icon: PawPrint,
   },
   {
+    id: "memberships",
     to: "/memberships",
     label: "Membresías",
     description: "Ahorra con un plan",
     icon: Crown,
   },
   {
+    id: "shop",
     to: "/shop",
     label: "Tienda",
     description: "Productos curados",
     icon: ShoppingBag,
   },
 ];
+
+const QUICK_ACTIONS = ALL_QUICK_ACTIONS.filter(
+  (a) => SHOP_ENABLED || a.id !== "shop",
+);
 
 function greetingForHour(hour: number): string {
   if (hour < 12) return "Buenos días";

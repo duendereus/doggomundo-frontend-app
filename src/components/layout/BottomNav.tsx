@@ -1,9 +1,10 @@
 import { NavLink } from "react-router-dom";
 import { Home, CalendarPlus, CalendarDays, ShoppingBag, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SHOP_ENABLED } from "@/lib/features";
 import { selectCartCount, useCartStore } from "@/stores/cart-store";
 
-const TABS = [
+const ALL_TABS = [
   { to: "/", label: "Inicio", icon: Home, end: true, key: "home" },
   { to: "/book", label: "Reservar", icon: CalendarPlus, end: false, key: "book" },
   {
@@ -17,6 +18,8 @@ const TABS = [
   { to: "/profile", label: "Perfil", icon: User, end: true, key: "profile" },
 ] as const;
 
+const TABS = ALL_TABS.filter((tab) => SHOP_ENABLED || tab.key !== "shop");
+
 export function BottomNav() {
   const cartCount = useCartStore(selectCartCount);
 
@@ -26,7 +29,9 @@ export function BottomNav() {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Navegación principal"
     >
-      <ul className="grid grid-cols-5">
+      <ul
+        className={cn("grid", TABS.length === 5 ? "grid-cols-5" : "grid-cols-4")}
+      >
         {TABS.map((tab) => {
           const showBadge = tab.key === "shop" && cartCount > 0;
           return (
