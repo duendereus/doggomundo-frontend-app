@@ -25,14 +25,34 @@ import {
   type FollowUpSuggestion,
 } from "@/features/booking/components/FollowUpSuggestions";
 import { useBookingFlowStore } from "@/stores/booking-flow-store";
+import type {
+  BookingLocationSnapshot,
+  BookingServiceSnapshot,
+  BookingSlotSnapshot,
+  BookingPetSnapshot,
+} from "@/stores/booking-flow-store";
 import {
   useAvailableSlots,
   useCreateAppointment,
 } from "@/api/hooks/use-appointments";
 import { usePets } from "@/api/hooks/use-pets";
 import { formatLongDate, formatTime } from "@/lib/format-date";
+import type { BusinessUnitCode } from "@/types/business-unit";
 
-const FOLLOWUP_WINDOW_HOURS = 8;
+// Search window around the just-booked slot for follow-up suggestions.
+// Looking before the booking too matters: with sparse slot grids the next
+// available slot AFTER could be hours away while the slot right BEFORE is
+// just 30 min off — much more useful for chaining a multi-pet visit.
+const FOLLOWUP_WINDOW_BEFORE_HOURS = 4;
+const FOLLOWUP_WINDOW_AFTER_HOURS = 8;
+
+interface BookingSnapshot {
+  businessUnitCode: BusinessUnitCode | null;
+  location: BookingLocationSnapshot;
+  service: BookingServiceSnapshot;
+  slot: BookingSlotSnapshot;
+  pet: BookingPetSnapshot;
+}
 
 function extractApiError(err: unknown): string {
   if (!axios.isAxiosError(err)) {
@@ -60,45 +80,99 @@ export function BookingReviewPage() {
   const navigate = useNavigate();
   const state = useBookingFlowStore();
   const reset = useBookingFlowStore((s) => s.reset);
-  const setPet = useBookingFlowStore((s) => s.setPet);
-  const setSlot = useBookingFlowStore((s) => s.setSlot);
   const setNotes = useBookingFlowStore((s) => s.setNotes);
   const create = useCreateAppointment();
 
   const [error, setError] = useState<string | null>(null);
+  // Snapshot of the just-booked appointment. Captured the first time the
+  // success branch fires so we can clear the wizard store immediately —
+  // otherwise tapping the "Reservar" tab from the nav while on the success
+  // screen would cascade through BookingLandingPage and dump the user on a
+  // stale review for the appointment they JUST confirmed.
+  const [snapshot, setSnapshot] = useState<BookingSnapshot | null>(null);
+  // Pets the user has booked in this success-screen chain. Without tracking
+  // this, the second iteration would happily suggest the first-iteration's
+  // pet again — same pet booked twice in a row makes no sense.
+  const [bookedInSession, setBookedInSession] = useState<Set<string>>(
+    () => new Set(),
+  );
 
-  // Other active pets the customer owns. After a successful booking these
-  // are the candidates for the follow-up nudge. We compute it up-front so
-  // both the success branch and the slot-query enabled flag can use it.
   const { data: petsData } = usePets();
-  const otherPets = useMemo(() => {
-    if (!petsData || !state.pet) return [];
-    return petsData.results.filter(
-      (p) => p.is_active && p.id !== state.pet!.id,
-    );
-  }, [petsData, state.pet]);
 
-  // Fetch the next handful of available slots for the same service in the
-  // same BU, starting right after the just-booked slot ends. Only fires
-  // when there's at least one other pet to suggest to.
-  const startAfter = state.slot?.end ?? null;
+  // Capture the just-booked details on the FIRST success render, then
+  // reset the wizard. The success branch reads from `snapshot` going
+  // forward, so wiping the store doesn't break the screen.
+  useEffect(() => {
+    if (!create.isSuccess) return;
+    if (snapshot) return;
+    if (!state.location || !state.service || !state.slot || !state.pet) return;
+    setSnapshot({
+      businessUnitCode: state.businessUnitCode,
+      location: state.location,
+      service: state.service,
+      slot: state.slot,
+      pet: state.pet,
+    });
+    setBookedInSession((prev) => {
+      if (prev.has(state.pet!.id)) return prev;
+      const next = new Set(prev);
+      next.add(state.pet!.id);
+      return next;
+    });
+    reset();
+  }, [
+    create.isSuccess,
+    snapshot,
+    state.businessUnitCode,
+    state.location,
+    state.service,
+    state.slot,
+    state.pet,
+    reset,
+  ]);
+
+  // Other active pets the customer owns minus any they've already booked
+  // in this success-screen chain (the just-booked one plus prior picks).
+  const otherPets = useMemo(() => {
+    if (!petsData || !snapshot) return [];
+    return petsData.results.filter(
+      (p) =>
+        p.is_active &&
+        p.id !== snapshot.pet.id &&
+        !bookedInSession.has(p.id),
+    );
+  }, [petsData, snapshot, bookedInSession]);
+
+  // Query a window AROUND the just-booked slot — before and after — so we
+  // can surface a slot 30 min earlier when that's closer than the next free
+  // slot 2h later. The backend's `is_available` flag already excludes the
+  // just-booked one (it's taken now), so it can't appear in suggestions.
+  const justBookedStart = snapshot?.slot.start ?? null;
+  const justBookedEnd = snapshot?.slot.end ?? null;
+  const startAfter = useMemo(() => {
+    if (!justBookedStart) return null;
+    const t = new Date(justBookedStart).getTime();
+    return new Date(
+      t - FOLLOWUP_WINDOW_BEFORE_HOURS * 60 * 60 * 1000,
+    ).toISOString();
+  }, [justBookedStart]);
   const startBefore = useMemo(() => {
-    if (!startAfter) return null;
-    const t = new Date(startAfter).getTime();
-    return new Date(t + FOLLOWUP_WINDOW_HOURS * 60 * 60 * 1000).toISOString();
-  }, [startAfter]);
+    if (!justBookedEnd) return null;
+    const t = new Date(justBookedEnd).getTime();
+    return new Date(
+      t + FOLLOWUP_WINDOW_AFTER_HOURS * 60 * 60 * 1000,
+    ).toISOString();
+  }, [justBookedEnd]);
   const followUpEnabled =
-    create.isSuccess &&
+    !!snapshot &&
     otherPets.length > 0 &&
-    !!state.location &&
-    !!state.service &&
     !!startAfter &&
     !!startBefore;
   const { data: nextSlotsData, isLoading: slotsLoading } = useAvailableSlots(
     followUpEnabled
       ? {
-          business_unit: state.location!.businessUnitId,
-          service: state.service!.id,
+          business_unit: snapshot!.location.businessUnitId,
+          service: snapshot!.service.id,
           start_after: startAfter!,
           start_before: startBefore!,
         }
@@ -106,62 +180,75 @@ export function BookingReviewPage() {
     followUpEnabled,
   );
 
-  // Pair each remaining pet with a distinct upcoming slot — pet[0] gets the
-  // earliest free slot, pet[1] the next, etc. Capacity-aware: if there are
-  // fewer slots than pets, only the pets that fit are surfaced.
+  // Pair each remaining pet with a distinct slot. Sort by closeness to the
+  // just-booked time so "13:30" beats "16:00" when the booked slot is
+  // 14:00. Ties (equidistant before vs after) prefer AFTER — the more
+  // natural "while you're already here" flow.
   const suggestions: FollowUpSuggestion[] = useMemo(() => {
-    if (!followUpEnabled || !nextSlotsData) return [];
+    if (!followUpEnabled || !nextSlotsData || !justBookedStart) return [];
+    const bookedT = new Date(justBookedStart).getTime();
     const available = nextSlotsData.results
       .filter((s) => s.is_available)
-      .sort(
-        (a, b) =>
-          new Date(a.start).getTime() - new Date(b.start).getTime(),
-      );
+      .sort((a, b) => {
+        const aT = new Date(a.start).getTime();
+        const bT = new Date(b.start).getTime();
+        const aDist = Math.abs(aT - bookedT);
+        const bDist = Math.abs(bT - bookedT);
+        if (aDist !== bDist) return aDist - bDist;
+        // Tie: prefer the later slot (after the booking).
+        return bT - aT;
+      });
     return otherPets
       .slice(0, available.length)
       .map((pet, i) => ({ pet, slot: available[i] }));
-  }, [followUpEnabled, nextSlotsData, otherPets]);
+  }, [followUpEnabled, nextSlotsData, otherPets, justBookedStart]);
 
   // No follow-up to show → keep the legacy "auto-navigate after a beat"
-  // behavior so the user isn't stuck on the success screen. When follow-up
-  // suggestions ARE available we hold position and let them decide.
+  // so the user isn't stuck. Hold off until snapshot is captured AND the
+  // slot query (if any) has resolved — otherwise we'd race the suggestions
+  // and navigate away before they had a chance to render.
   const hasFollowUp = suggestions.length > 0;
-  const followUpReady = !followUpEnabled || !slotsLoading;
+  const suggestionsReady =
+    !!snapshot && (!followUpEnabled || !slotsLoading);
   useEffect(() => {
     if (!create.isSuccess) return;
-    if (!followUpReady) return;
+    if (!suggestionsReady) return;
     if (hasFollowUp) return;
     const t = setTimeout(() => {
-      reset();
       navigate("/my/appointments", { replace: true });
     }, 2800);
     return () => clearTimeout(t);
-  }, [create.isSuccess, followUpReady, hasFollowUp, reset, navigate]);
+  }, [create.isSuccess, suggestionsReady, hasFollowUp, navigate]);
 
-  if (create.isSuccess) {
+  if (create.isSuccess && snapshot) {
     return (
       <SuccessScreen
         suggestions={suggestions}
-        serviceName={state.service?.name ?? ""}
-        servicePriceLabel={formatPriceLabel(state.service?.price)}
+        serviceName={snapshot.service.name}
+        servicePriceLabel={formatPriceLabel(snapshot.service.price)}
         onPickSuggestion={(s) => {
-          // Swap pet + slot in the wizard, then drop `create.isSuccess` so
-          // the page re-renders the regular review pane with the new pair
-          // ready to confirm. BU/location/service/notes carry over.
-          setPet({ id: s.pet.id, name: s.pet.name });
-          setSlot({
-            slotId: s.slot.id,
-            start: s.slot.start,
-            end: s.slot.end,
-            resource: s.slot.resource,
+          // Re-seed the wizard atomically with the snapshot's BU/location/
+          // service plus the new pet+slot pair. setState (rather than the
+          // individual setBusinessUnit/setLocation/setService actions)
+          // avoids those actions' "wipe everything downstream" semantics.
+          useBookingFlowStore.setState({
+            businessUnitCode: snapshot.businessUnitCode,
+            location: snapshot.location,
+            service: snapshot.service,
+            slot: {
+              slotId: s.slot.id,
+              start: s.slot.start,
+              end: s.slot.end,
+              resource: s.slot.resource,
+            },
+            pet: { id: s.pet.id, name: s.pet.name },
+            notes: "",
           });
           create.reset();
+          setSnapshot(null);
           setError(null);
         }}
-        onDone={() => {
-          reset();
-          navigate("/my/appointments", { replace: true });
-        }}
+        onDone={() => navigate("/my/appointments", { replace: true })}
       />
     );
   }

@@ -226,4 +226,59 @@ describe("BookingReviewPage", () => {
     expect(useBookingFlowStore.getState().slot?.slotId).toBe("slot-2");
     expect(screen.queryByTestId("appointments-page")).not.toBeInTheDocument();
   });
+
+  it("clears the wizard store on success so the nav doesn't fast-forward to a stale review", async () => {
+    seedFlow();
+    server.use(
+      http.post(`${API}/appointments/`, () =>
+        HttpResponse.json(
+          {
+            id: "appt-1",
+            business_unit: "bu-1",
+            business_unit_name: "Grooming Polanco",
+            pet: "pet-1",
+            scheduled_start: "2030-01-15T16:00:00Z",
+            scheduled_end: "2030-01-15T17:00:00Z",
+            status: "scheduled",
+            status_display: "Programada",
+            channel: "web",
+            notes: "",
+            items: [],
+            created_at: "2030-01-01T00:00:00Z",
+            updated_at: "2030-01-01T00:00:00Z",
+          },
+          { status: 201 },
+        ),
+      ),
+      // Single pet — no follow-up suggestions, so the chain doesn't keep
+      // the store hydrated for that path.
+      http.get(`${API}/pets/`, () =>
+        HttpResponse.json({
+          count: 1,
+          next: null,
+          previous: null,
+          results: [makePetListItem({ id: "pet-1", name: "Nala" })],
+        }),
+      ),
+    );
+
+    const user = userEvent.setup();
+    renderReview();
+    await user.click(
+      screen.getByRole("button", { name: /confirmar reserva/i }),
+    );
+
+    expect(await screen.findByText(/¡listo!/i)).toBeInTheDocument();
+
+    // After capturing the snapshot on success, the wizard store should be
+    // empty — otherwise tapping "Reservar" in the nav while still on this
+    // screen would land the user on a stale review for what they just
+    // confirmed.
+    await waitFor(() => {
+      expect(useBookingFlowStore.getState().pet).toBeNull();
+    });
+    expect(useBookingFlowStore.getState().location).toBeNull();
+    expect(useBookingFlowStore.getState().service).toBeNull();
+    expect(useBookingFlowStore.getState().slot).toBeNull();
+  });
 });
