@@ -99,38 +99,6 @@ export function BookingReviewPage() {
 
   const { data: petsData } = usePets();
 
-  // Capture the just-booked details on the FIRST success render, then
-  // reset the wizard. The success branch reads from `snapshot` going
-  // forward, so wiping the store doesn't break the screen.
-  useEffect(() => {
-    if (!create.isSuccess) return;
-    if (snapshot) return;
-    if (!state.location || !state.service || !state.slot || !state.pet) return;
-    setSnapshot({
-      businessUnitCode: state.businessUnitCode,
-      location: state.location,
-      service: state.service,
-      slot: state.slot,
-      pet: state.pet,
-    });
-    setBookedInSession((prev) => {
-      if (prev.has(state.pet!.id)) return prev;
-      const next = new Set(prev);
-      next.add(state.pet!.id);
-      return next;
-    });
-    reset();
-  }, [
-    create.isSuccess,
-    snapshot,
-    state.businessUnitCode,
-    state.location,
-    state.service,
-    state.slot,
-    state.pet,
-    reset,
-  ]);
-
   // Other active pets the customer owns minus any they've already booked
   // in this success-screen chain (the just-booked one plus prior picks).
   const otherPets = useMemo(() => {
@@ -267,6 +235,17 @@ export function BookingReviewPage() {
   async function handleConfirm() {
     if (!state.service || !state.location || !state.slot || !state.pet) return;
 
+    // Capture the values we'll need on the success screen BEFORE the
+    // mutation runs — `reset()` after the await wipes the store and the
+    // closure values are what we hand to the snapshot.
+    const justBooked: BookingSnapshot = {
+      businessUnitCode: state.businessUnitCode,
+      location: state.location,
+      service: state.service,
+      slot: state.slot,
+      pet: state.pet,
+    };
+
     setError(null);
     try {
       await create.mutateAsync({
@@ -283,8 +262,18 @@ export function BookingReviewPage() {
           },
         ],
       });
-      // Success: the component re-renders and swaps to BookingSuccessAnimation,
-      // which handles the navigation after its own animation finishes.
+      // Event-driven (vs. derived in an effect): record the snapshot,
+      // add the pet to the booked-in-session set, and clear the wizard
+      // store so the nav doesn't fast-forward into a stale review on
+      // its next visit.
+      setSnapshot(justBooked);
+      setBookedInSession((prev) => {
+        if (prev.has(justBooked.pet.id)) return prev;
+        const next = new Set(prev);
+        next.add(justBooked.pet.id);
+        return next;
+      });
+      reset();
     } catch (err) {
       setError(extractApiError(err));
     }
