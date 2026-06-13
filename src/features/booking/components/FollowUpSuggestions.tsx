@@ -1,4 +1,5 @@
 import { CalendarPlus, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatRelativeAppointment } from "@/lib/format-date";
 import type { PetListItem } from "@/types/pet";
@@ -15,6 +16,17 @@ interface Props {
   /** Pre-formatted price label (e.g. "$250") or null when not applicable. */
   servicePriceLabel: string | null;
   onPick: (suggestion: FollowUpSuggestion) => void;
+  /**
+   * Books every suggestion in one click. Only rendered when there are 2+
+   * suggestions — with a single suggestion the card itself is already a
+   * one-click action and a second button would just be noise.
+   */
+  onPickAll: (suggestions: FollowUpSuggestion[]) => void;
+  /**
+   * True while a bulk booking is in flight. Disables every action so the
+   * user can't double-click into a partial-success mess.
+   */
+  isBookingAll: boolean;
 }
 
 /**
@@ -29,6 +41,8 @@ export function FollowUpSuggestions({
   serviceName,
   servicePriceLabel,
   onPick,
+  onPickAll,
+  isBookingAll,
 }: Props) {
   if (suggestions.length === 0) return null;
 
@@ -48,7 +62,8 @@ export function FollowUpSuggestions({
             key={s.pet.id}
             type="button"
             onClick={() => onPick(s)}
-            className="block w-full text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 rounded-xl"
+            disabled={isBookingAll}
+            className="block w-full text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 rounded-xl disabled:opacity-60"
           >
             <Card className="transition-shadow hover:shadow-md" size="sm">
               <CardContent className="flex items-center gap-3 px-3">
@@ -70,6 +85,18 @@ export function FollowUpSuggestions({
           </button>
         ))}
       </div>
+
+      {suggestions.length >= 2 && (
+        <Button
+          onClick={() => onPickAll(suggestions)}
+          disabled={isBookingAll}
+          className="w-full"
+        >
+          {isBookingAll
+            ? "Reservando…"
+            : `Reservar las ${suggestions.length} citas`}
+        </Button>
+      )}
     </section>
   );
 }

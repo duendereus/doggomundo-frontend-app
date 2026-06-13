@@ -96,6 +96,11 @@ export function BookingReviewPage() {
   const [bookedInSession, setBookedInSession] = useState<Set<string>>(
     () => new Set(),
   );
+  // Locks the success-screen render while a bulk booking loop is in flight.
+  // The underlying mutation cycles its isPending/isSuccess flags between
+  // POSTs, so without this latch the page would flicker back to the
+  // regular review pane mid-loop.
+  const [isBulkBooking, setIsBulkBooking] = useState(false);
 
   const { data: petsData } = usePets();
 
@@ -188,12 +193,54 @@ export function BookingReviewPage() {
     return () => clearTimeout(t);
   }, [create.isSuccess, suggestionsReady, hasFollowUp, navigate]);
 
-  if (create.isSuccess && snapshot) {
+  // Bulk-book every remaining suggestion in one click. Stops on the first
+  // failure so the user can see what went wrong; successfully-booked pets
+  // stay booked and get added to `bookedInSession` so the re-rendered
+  // suggestion list excludes them. `isBulkBooking` keeps the success
+  // branch latched in while POSTs cycle the mutation flags.
+  async function handlePickAll(items: FollowUpSuggestion[]) {
+    if (!snapshot) return;
+    setIsBulkBooking(true);
+    setError(null);
+    for (const s of items) {
+      try {
+        await create.mutateAsync({
+          business_unit: snapshot.location.businessUnitId,
+          pet: s.pet.id,
+          scheduled_start: s.slot.start,
+          scheduled_end: s.slot.end,
+          channel: "web",
+          items: [
+            {
+              service: snapshot.service.id,
+              resource: s.slot.resource ?? undefined,
+            },
+          ],
+        });
+        setBookedInSession((prev) => {
+          if (prev.has(s.pet.id)) return prev;
+          const next = new Set(prev);
+          next.add(s.pet.id);
+          return next;
+        });
+      } catch (err) {
+        setIsBulkBooking(false);
+        setError(extractApiError(err));
+        return;
+      }
+    }
+    setIsBulkBooking(false);
+    navigate("/my/appointments", { replace: true });
+  }
+
+  if ((create.isSuccess || isBulkBooking) && snapshot) {
     return (
       <SuccessScreen
         suggestions={suggestions}
         serviceName={snapshot.service.name}
         servicePriceLabel={formatPriceLabel(snapshot.service.price)}
+        error={error}
+        isBulkBooking={isBulkBooking}
         onPickSuggestion={(s) => {
           // Re-seed the wizard atomically with the snapshot's BU/location/
           // service plus the new pet+slot pair. setState (rather than the
@@ -216,6 +263,7 @@ export function BookingReviewPage() {
           setSnapshot(null);
           setError(null);
         }}
+        onPickAll={handlePickAll}
         onDone={() => navigate("/my/appointments", { replace: true })}
       />
     );
@@ -385,7 +433,10 @@ interface SuccessScreenProps {
   suggestions: FollowUpSuggestion[];
   serviceName: string;
   servicePriceLabel: string | null;
+  error: string | null;
+  isBulkBooking: boolean;
   onPickSuggestion: (s: FollowUpSuggestion) => void;
+  onPickAll: (suggestions: FollowUpSuggestion[]) => void;
   onDone: () => void;
 }
 
@@ -393,7 +444,10 @@ function SuccessScreen({
   suggestions,
   serviceName,
   servicePriceLabel,
+  error,
+  isBulkBooking,
   onPickSuggestion,
+  onPickAll,
   onDone,
 }: SuccessScreenProps) {
   return (
@@ -418,11 +472,23 @@ function SuccessScreen({
             serviceName={serviceName}
             servicePriceLabel={servicePriceLabel}
             onPick={onPickSuggestion}
+            onPickAll={onPickAll}
+            isBookingAll={isBulkBooking}
           />
         </div>
       )}
 
-      <Button variant={suggestions.length > 0 ? "outline" : "default"} onClick={onDone}>
+      {error && (
+        <div className="w-full max-w-sm">
+          <FormErrors message={error} />
+        </div>
+      )}
+
+      <Button
+        variant={suggestions.length > 0 ? "outline" : "default"}
+        onClick={onDone}
+        disabled={isBulkBooking}
+      >
         Ver mis citas
       </Button>
     </div>

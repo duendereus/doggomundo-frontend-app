@@ -227,6 +227,107 @@ describe("BookingReviewPage", () => {
     expect(screen.queryByTestId("appointments-page")).not.toBeInTheDocument();
   });
 
+  it("books every suggestion at once when the user taps 'Reservar las N citas'", async () => {
+    seedFlow();
+    const postedPets: string[] = [];
+    server.use(
+      http.post(`${API}/appointments/`, async ({ request }) => {
+        const body = (await request.json()) as { pet: string };
+        postedPets.push(body.pet);
+        return HttpResponse.json(
+          {
+            id: `appt-${postedPets.length}`,
+            business_unit: "bu-1",
+            business_unit_name: "Grooming Polanco",
+            pet: body.pet,
+            scheduled_start: "2030-01-15T16:00:00Z",
+            scheduled_end: "2030-01-15T17:00:00Z",
+            status: "scheduled",
+            status_display: "Programada",
+            channel: "web",
+            notes: "",
+            items: [],
+            created_at: "2030-01-01T00:00:00Z",
+            updated_at: "2030-01-01T00:00:00Z",
+          },
+          { status: 201 },
+        );
+      }),
+      // 3 pets total: the one just booked plus two for follow-up.
+      http.get(`${API}/pets/`, () =>
+        HttpResponse.json({
+          count: 3,
+          next: null,
+          previous: null,
+          results: [
+            makePetListItem({ id: "pet-1", name: "Nala" }),
+            makePetListItem({ id: "pet-2", name: "Max" }),
+            makePetListItem({ id: "pet-3", name: "Luna" }),
+          ],
+        }),
+      ),
+      // Two follow-up slots — one per remaining pet.
+      http.get(`${API}/appointments/slots/`, () =>
+        HttpResponse.json({
+          count: 2,
+          next: null,
+          previous: null,
+          results: [
+            {
+              id: "slot-2",
+              business_unit: "bu-1",
+              service: "srv-1",
+              service_name: "Corte completo",
+              staff_user: null,
+              resource: "res-1",
+              start: "2030-01-15T17:00:00Z",
+              end: "2030-01-15T18:00:00Z",
+              is_available: true,
+            },
+            {
+              id: "slot-3",
+              business_unit: "bu-1",
+              service: "srv-1",
+              service_name: "Corte completo",
+              staff_user: null,
+              resource: "res-1",
+              start: "2030-01-15T18:00:00Z",
+              end: "2030-01-15T19:00:00Z",
+              is_available: true,
+            },
+          ],
+        }),
+      ),
+    );
+
+    const user = userEvent.setup();
+    renderReview();
+    await user.click(
+      screen.getByRole("button", { name: /confirmar reserva/i }),
+    );
+
+    // Wait for both suggestion cards to render — confirms the chain has
+    // settled before we click the bulk button.
+    expect(
+      await screen.findByRole("button", {
+        name: /corte completo para max/i,
+      }),
+    ).toBeInTheDocument();
+
+    const bulkButton = screen.getByRole("button", {
+      name: /reservar las 2 citas/i,
+    });
+    await user.click(bulkButton);
+
+    // 3 POSTs total: initial pet-1 + bulk pet-2 + bulk pet-3, in that order.
+    await waitFor(() =>
+      expect(postedPets).toEqual(["pet-1", "pet-2", "pet-3"]),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("appointments-page")).toBeInTheDocument(),
+    );
+  });
+
   it("clears the wizard store on success so the nav doesn't fast-forward to a stale review", async () => {
     seedFlow();
     server.use(
